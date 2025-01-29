@@ -2,7 +2,6 @@ from functools import wraps
 
 from flask import Flask, request, redirect, url_for, session, abort
 from flask_authz import CasbinEnforcer
-import casbin
 import logging
 from casbin.persist.adapters import FileAdapter
 
@@ -17,7 +16,6 @@ USERS = {
 
 # Casbin enforcer
 app.config["CASBIN_MODEL"] = "model.conf"
-app.config["CASBIN_POLICY"] = "policy.csv"
 app.config['CASBIN_OWNER_HEADERS'] = {'X-User', 'X-Group'}
 app.config['CASBIN_USER_NAME_HEADERS'] = {'X-User'}
 adapter = FileAdapter('policy.csv')
