@@ -1,12 +1,27 @@
+import os
 from functools import wraps
 
 from flask import Flask, request, redirect, url_for, session, abort
-from flask_authz import CasbinEnforcer
 import logging
-from casbin.persist.adapters import FileAdapter
+import casbin_sqlalchemy_adapter
+import casbin
+from flask_sqlalchemy import SQLAlchemy
+
+
+class Config:
+    SQLALCHEMY_DATABASE_URI = os.getenv(
+        "DATABASE_URL", "postgresql://postgres:postgres@localhost:5444/test"
+    )
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
+
 
 app = Flask(__name__)
 app.secret_key = "supersecretkey"  # Required for session management
+app.config.from_object(Config)
+
+db = SQLAlchemy()
+db.init_app(app)
+
 
 # Hardcoded credentials for simplicity
 USERS = {
@@ -15,11 +30,9 @@ USERS = {
 }
 
 # Casbin enforcer
-app.config["CASBIN_MODEL"] = "model.conf"
-app.config['CASBIN_OWNER_HEADERS'] = {'X-User', 'X-Group'}
-app.config['CASBIN_USER_NAME_HEADERS'] = {'X-User'}
-adapter = FileAdapter('policy.csv')
-authz = CasbinEnforcer(app, adapter)
+with app.app_context():
+    adapter = casbin_sqlalchemy_adapter.Adapter(db.engine)
+    enforcer = casbin.Enforcer('model.conf', adapter)
 
 
 def requires_auth(f):
@@ -28,7 +41,7 @@ def requires_auth(f):
         user = session.get("user")
         if user:
             # Casbin enforces authorization
-            if authz.e.enforce(user, request.path, request.method):
+            if enforcer.enforce(user, request.path, request.method):
                 return f(*args, **kwargs)
             else:
                 abort(403)  # Forbidden
@@ -84,6 +97,15 @@ def admin():
 @requires_auth
 def dashboard():
     return "<p>Welcome to the user dashboard.</p>"
+
+
+@app.route("/reload", methods=["POST"])
+def reload():
+    try:
+        enforcer.load_policy()
+    except Exception as e:
+        return {"success": False}, 400
+    return {"success": True}, 200
 
 
 if __name__ == "__main__":

@@ -3,3 +3,4 @@ p, user, /dashboard, GET
 
 g, alice, admin
 g, bob, user
+g, admin, user
