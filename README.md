@@ -14,3 +14,8 @@
 uwsgi --ini uwsgi.ini
 ```
 Note the uwsgi binary must be the one inside the venv, not a system wide one
+
+## Request Items
+```bash
+curl -X GET -H "Content-Type: application/json" http://127.0.0.1:9090/items
+```
