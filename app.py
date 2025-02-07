@@ -1,7 +1,7 @@
 import os
 from functools import wraps
 
-from flask import Flask, request, redirect, url_for, session, abort
+from flask import Flask, request, redirect, url_for, session, abort, jsonify
 import logging
 import casbin_sqlalchemy_adapter
 import casbin
@@ -35,6 +35,26 @@ with app.app_context():
     enforcer = casbin.Enforcer('model.conf', adapter)
 
 
+# Define the Item model
+class Item(db.Model):
+    __tablename__ = 'items'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(80), nullable=False)
+    description = db.Column(db.String(200), nullable=True)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+            "description": self.description
+        }
+
+
+# Create the database tables
+with app.app_context():
+    db.create_all()
+
+
 def requires_auth(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -49,6 +69,41 @@ def requires_auth(f):
             return redirect(url_for("login"))
 
     return decorated
+
+
+@app.route("/items", methods=["GET"])
+def get_items():
+    items = Item.query.all()
+    return jsonify([item.to_dict() for item in items])
+
+
+@app.route("/item", methods=["POST"])
+def create_item():
+    data = request.get_json()
+    if not data or "name" not in data:
+        return {"error": "Invalid request. 'name' is required."}, 400
+
+    item = Item(name=data["name"], description=data.get("description", ""))
+    db.session.add(item)
+    db.session.commit()
+    return jsonify(item.to_dict()), 201
+
+
+@app.route("/item/<int:item_id>", methods=["PUT"])
+def update_item(item_id):
+    item = Item.query.get(item_id)
+    if not item:
+        return {"error": "Item not found"}, 404
+
+    data = request.get_json()
+    if "name" in data:
+        item.name = data["name"]
+    if "description" in data:
+        item.description = data["description"]
+
+    db.session.commit()
+    return jsonify(item.to_dict()), 200
+
 
 
 @app.route("/")
