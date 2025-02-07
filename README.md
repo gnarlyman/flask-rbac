@@ -8,3 +8,9 @@
 
 - alice password123  #Admin
 - bob password456  #User
+
+## Running UWSGI
+```bash
+uwsgi --ini uwsgi.ini
+```
+Note the uwsgi binary must be the one inside the venv, not a system wide one
